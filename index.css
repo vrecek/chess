@@ -1,0 +1,134 @@
+*{
+   margin:0;
+   padding: 0;
+   box-sizing: border-box;
+   font-weight: 300;
+}
+
+body{
+   background: url('https://images.unsplash.com/photo-1555505019-8c3f1c4aba5f?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80');
+   height: 100vh;
+   overflow: hidden;
+   background-size: cover;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   position: relative;
+}
+
+main{
+   width: 700px;
+   height: 700px;
+   border-radius: .2em;
+   background: saddlebrown;
+   display: flex;
+   flex-wrap: wrap;
+   border: 1px solid whitesmoke;
+}
+
+section{
+   position: absolute;
+   top:50%;
+   left:4%;
+   transform: translateY(-50%);
+   text-align: center;
+   width: 300px;
+   box-shadow: 0 0 2px black, 0 0 4px black, 0 0 8px black, 0 0 16px black;
+   backdrop-filter: blur(4px);
+   border-radius: .2em;
+}
+
+section h3{
+   text-transform: uppercase;
+   font-size: 1.5rem;
+   color: white;
+   font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+   text-shadow: 0 0 1px black;
+}
+
+section h1{
+   text-transform: uppercase;
+   padding:.5em;
+   font-size: 2.5rem;
+   font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+   color:white;
+   border-radius: .2em;
+   width: 70%;
+}
+
+section div{
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 100%;
+}
+
+section div img{
+   width: 40px;
+   height: 40px;
+}
+
+h2{
+   position: absolute;
+   left:50%;
+   top:-50%;
+   transform: translateX(-50%);
+   border-radius: .3em;
+   font-family: 'Courier New', Courier, monospace;
+   padding: .5em 1em;
+   font-size: 2rem;
+   display: block;
+   z-index: 9999;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   animation: anim 1s;
+   animation-fill-mode: forwards;
+}
+
+@keyframes anim {
+   0%{ top: -50%; }
+   100%{ top:0; }
+}
+
+h2.black{ 
+   background: #505050;
+   color: white;
+   border: 2px solid whitesmoke;
+}
+
+h2.white{
+   background: #e7e0e0;
+   color: #101010;
+   border: 2px solid #101010;
+}
+
+h2 img{
+   width: 60px;
+   height: 60px;
+   margin-right: .5em;
+}
+
+main div{
+   width: 87.2px;
+   height: 86.5px;
+   cursor: pointer;
+   border: 1px solid brown;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   position: relative;
+}
+
+main div img{
+   pointer-events: none;
+}
+
+main div span{
+   position: absolute;
+   width: 30%;
+   height: 30%;
+   background: #0ec997;
+   border-radius: 50%;
+   pointer-events: none;
+}
