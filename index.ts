@@ -38,23 +38,58 @@ const icons = [
    }
 ]
 const main = document.querySelector('main') as HTMLElement
-const turnSection = document.querySelector('section') as HTMLElement
+
 const turnText = document.querySelector('section h1') as HTMLElement
-const turnImgs= document.querySelectorAll('section div img') as NodeListOf<HTMLElement>
+const turnImgs= document.querySelectorAll('section div img') as NodeListOf<HTMLImageElement>
+
+const turnSection = document.querySelector('.turn') as HTMLElement
+const restartSection = document.querySelector('.other') as HTMLElement
+
+const min = document.querySelector('.timer .min') as HTMLElement
+const sec = document.querySelector('.timer .sec') as HTMLElement
 
 /* */
-const game = new Game(icons)
+const game = new Game(icons, main)
 
-const swapTurn = game.swapTurn()
-let turn:string = swapTurn.next().value
+let swapTurn = game.swapTurn()
+let turn:'white' | 'black' = swapTurn.next().value
 
-const fields = game.draw_start(main)
+const fields = game.draw_start()
+game.addClick(fields, clickHandle)
+game.startTimer(min, sec)
 /* */
 
 let move:Array<HTMLElement> | null
 let currentField:any
 
-game.addClick(fields, dataset => {
+restartSection.children[0].addEventListener('click', () => {
+   for(let x of document.body.children){
+      if(x.tagName === 'H2') x.remove()
+   }
+
+   main.style.pointerEvents = 'all'
+   restartSection.style.display = 'none'
+
+   turnSection.style.display = 'block'
+   const ts = turnSection.children[1]
+
+   for(let x of ts.children){
+      if(x.tagName === 'H1'){
+         x.textContent = 'white'
+         continue
+      }
+
+      (<HTMLImageElement>x).src = 'https://upload.wikimedia.org/wikipedia/commons/3/3b/Chess_klt60.png'
+
+      swapTurn = game.swapTurn()
+      turn =  swapTurn.next().value
+
+      game.restartGame()
+      game.startTimer(min, sec)
+   }
+})
+
+function clickHandle(dataset:{ col:number, row:number }){
    const { col, row } = dataset
    
    if(!move || !currentField) {
@@ -75,15 +110,16 @@ game.addClick(fields, dataset => {
 
          turnText.textContent = turn
          changeTurnIcons()
-
+         
          game.movePiece(x, currentField.element)
 
-         if(game.isKingDead(turn)){
+         if(game.isKingDead()){
             const t = turn === 'white' ? 'black' : 'white'
-            turnSection.style.display = 'none'
-            main.style.pointerEvents = 'none'
+            
+            displayFinish()
 
-            game.finishText(t)
+            game.finishPopUpText(t, restartSection)
+            game.stopTimer()
          }   
       }
 
@@ -92,17 +128,28 @@ game.addClick(fields, dataset => {
          y.remove()
       }
 
-      currentField.element.style.background = currentField.background
+      if(currentField.element.style.background === 'rgb(14, 201, 151)'){
+         currentField.element.style.background = currentField.background
+      } 
    }
+
    move = null
    currentField = null
-})
+}
 
 function changeTurnIcons():void{
    for(let x of [...turnImgs]){
       //@ts-ignore
-      x.src = icons[1][turn]
+      (<HTMLImageElement>x).src = icons[1][turn]
    }
+}
+
+function displayFinish():void{
+   turnSection.style.display = 'none'
+
+   main.style.pointerEvents = 'none'
+
+   restartSection.style.display = 'flex'
 }
 
 

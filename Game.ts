@@ -18,6 +18,29 @@ interface appending_piece {
    type: string | null
 }
 
+interface castling {
+   white: {
+      canDo: boolean, 
+      kingMoved: boolean,
+      leftRookMoved: boolean,
+      rightRookMoved: boolean
+   },
+
+   black: {
+      canDo: boolean, 
+      kingMoved: boolean,
+      leftRookMoved: boolean,
+      rightRookMoved: boolean
+   }
+}
+
+enum oppositeColor {
+   black = 'white',
+   white = 'black'
+}
+
+type PlayerColor = 'black' | 'white'
+
 export class Game {
    private pawn:{ white: string, black: string } | undefined
    private rook:{ white: string, black: string } | undefined
@@ -26,14 +49,27 @@ export class Game {
    private queen:{ white: string, black: string } | undefined
    private king:{ white: string, black: string } | undefined
 
-   private field:Array<Array<HTMLElement>> = [
-      [], [], [], [], [], [], [], []
-   ]
+   private field:Array<Array<HTMLElement>>
    private currentField:element_background | undefined
+   private board:HTMLElement
+   private restartCb:Function
+
+   private check:any = {
+      player_color: '',
+      original_color: '',
+      danger: false,
+      king: null,
+      enemyMoves: null,
+      enemy: null
+   }
+
+   private castle:castling
+   private timer:any
+   private end:boolean = false
 
    //--- PRIVATE METHODS ---//
 
-   private pathHelper(dir:string, col:number, row:number, whosTurn:any, arr:Array<HTMLElement>):void{
+   private pathHelper(dir:string, col:number, row:number, whosTurn:'white' | 'black', arr:Array<HTMLElement>, dontSpan?:true):void{
       if(dir === 'horizontal') {
          for(let i = row-2, j = row; ; i--, j++){
             if(i < 0 && j > 7) break
@@ -48,7 +84,8 @@ export class Game {
                }
 
                const span = document.createElement('span')               
-               next.appendChild(span)
+               !dontSpan ? next.appendChild(span) : null
+
                arr.push(next) 
             }
 
@@ -62,7 +99,8 @@ export class Game {
                }
 
                const span = document.createElement('span')           
-               next.appendChild(span)
+               !dontSpan ? next.appendChild(span) : null
+
                arr.push(next) 
             }
          }
@@ -80,7 +118,8 @@ export class Game {
                }
 
                const span = document.createElement('span')              
-               next.appendChild(span)
+               !dontSpan ? next.appendChild(span) : null
+
                arr.push(next) 
             }
 
@@ -93,7 +132,8 @@ export class Game {
                }
 
                const span = document.createElement('span')           
-               next.appendChild(span)
+               !dontSpan ? next.appendChild(span) : null
+
                arr.push(next)
             }
          }
@@ -119,11 +159,11 @@ export class Game {
 
                const span = document.createElement('span')
 
-               if(this.collision(x.dir, whosTurn, i, 0, col, row, arr, e)){
+               if(this.collision(x.dir, whosTurn, i, 0, col, row, arr, e, dontSpan)){
                   break inner
                }
 
-               e.appendChild(span)
+               !dontSpan ? e.appendChild(span) : null
                arr.push(e)
             }
          }
@@ -163,7 +203,8 @@ export class Game {
             }
 
             const span = document.createElement('span')
-            x.appendChild(span)
+            !dontSpan ? x.appendChild(span) : null
+
             arr.push(x)
          }
       }
@@ -182,20 +223,68 @@ export class Game {
          }    
 
          for(let x of [lt, next, rt].filter(x => x)){
-            if(this.collision('pawn', whosTurn, 0, 0, col, row, arr, x)){
+            if(this.collision('pawn', whosTurn, 0, 0, col, row, arr, x, dontSpan)){
                continue
             }
 
             const span = document.createElement('span')
-            x.appendChild(span)
+            !dontSpan ? x.appendChild(span) : null
+
             arr.push(x)
+         }
+      }
+      else if(dir === 'castle'){
+         const cf = this.field[col - 1][row - 1]
+
+         if(!cf.classList.contains('king') || !this.castle[whosTurn].canDo) return
+
+         let [left, right] = [true, true]
+         for(let i = 1; i <= 6; i++){
+            const field = this.field[col - 1][i]
+
+            if(i < 4 && left){
+               field.classList.length ? left = false : null
+            }
+            else if(i > 4 && right){
+               field.classList.length ? right = false : null
+            }
+         }
+         
+         if(left && !this.castle[whosTurn].leftRookMoved){
+            const place = this.field[col - 1][2]
+
+            for(let x of place.children){
+               x.remove()
+            }
+
+            if(!dontSpan){
+               const span = document.createElement('span')
+               place.appendChild(span)
+            }
+
+            const span = document.createElement('span')
+            !dontSpan ? place.appendChild(span) : null
+            
+            arr.push(place)         
+         }
+         if(right && !this.castle[whosTurn].rightRookMoved){
+            const place = this.field[col - 1][6]
+
+            for(let x of place.children){
+               x.remove()
+            }
+
+            const span = document.createElement('span')
+            !dontSpan ? place.appendChild(span) : null
+      
+            arr.push(place)       
          }
       }
    }
 
    private collision
-   (dir:string, turn:string, i:number, j:number, col:number, row:number, addArr?:Array<HTMLElement>, ele?:HTMLElement)
-   :boolean | Array<HTMLElement> {
+   (dir:string, turn:string, i:number, j:number, col:number, row:number, addArr?:Array<HTMLElement>, ele?:HTMLElement, dontSpan?:true)
+   :boolean {
       switch(dir){
          case 'right':
             if((turn === 'white' && this.field[col - 1][j].classList.contains('white')) ||
@@ -249,11 +338,11 @@ export class Game {
                const span = document.createElement('span')
 
                if(turn === 'white' && col === 7 && !this.field[col - 3][row - 1].classList.length && !ele.classList.length){
-                  this.field[col - 3][row - 1].appendChild(span)
+                  !dontSpan ? this.field[col - 3][row - 1].appendChild(span) : null
                   addArr?.push(this.field[col - 3][row - 1])
 
                }else if(turn === 'black' && col === 2 && !this.field[col + 1][row - 1].classList.length && !ele.classList.length){
-                  this.field[col + 1][row - 1].appendChild(span)
+                  !dontSpan ? this.field[col + 1][row - 1].appendChild(span) : null
                   addArr?.push(this.field[col + 1][row - 1])
                }
                
@@ -280,7 +369,7 @@ export class Game {
                (turn === 'white' && ele.classList.contains('black'))
             ){
                const span = document.createElement('span')
-               ele.appendChild(span)
+               !dontSpan ? ele.appendChild(span) : null
                addArr?.push(ele)
                return true
             }
@@ -347,43 +436,76 @@ export class Game {
       return obj
    }
 
-   private createPath(current:HTMLElement, col:number, row:number, whosTurn:string){
+   private createPath(current:HTMLElement, col:number, row:number, whosTurn:'white' | 'black', dontSpan?:true):Array<HTMLElement>{
       let possibleMoves:Array<HTMLElement> = []
 
       switch(current.classList[0]){
          case 'rook':
-            this.pathHelper('horizontal', col, row, whosTurn, possibleMoves)
-            this.pathHelper('vertical', col, row, whosTurn, possibleMoves)
+            this.pathHelper('horizontal', col, row, whosTurn, possibleMoves, dontSpan)
+            this.pathHelper('vertical', col, row, whosTurn, possibleMoves, dontSpan)
          break;
 
          case 'pawn':   
-            this.pathHelper('pawn', col, row, whosTurn, possibleMoves) 
+            this.pathHelper('pawn', col, row, whosTurn, possibleMoves, dontSpan) 
          break
 
          case 'queen':
-            this.pathHelper('horizontal', col, row, whosTurn, possibleMoves)
-            this.pathHelper('vertical', col, row, whosTurn, possibleMoves)
-            this.pathHelper('diagonally', col, row, whosTurn, possibleMoves)
+            this.pathHelper('horizontal', col, row, whosTurn, possibleMoves, dontSpan)
+            this.pathHelper('vertical', col, row, whosTurn, possibleMoves, dontSpan)
+            this.pathHelper('diagonally', col, row, whosTurn, possibleMoves, dontSpan)
          break
 
          case 'bishop':
-            this.pathHelper('diagonally', col, row, whosTurn, possibleMoves)
+            this.pathHelper('diagonally', col, row, whosTurn, possibleMoves, dontSpan)
          break
 
          case 'knight':
-            this.pathHelper('jump_L', col, row, whosTurn, possibleMoves)
+            this.pathHelper('jump_L', col, row, whosTurn, possibleMoves, dontSpan)
          break
 
          case 'king':
-            this.pathHelper('around', col, row, whosTurn, possibleMoves)
+            this.pathHelper('around', col, row, whosTurn, possibleMoves, dontSpan)
+            this.pathHelper('castle', col, row, whosTurn, possibleMoves, dontSpan)
          break
 
          default: return []
       }
-
-      possibleMoves.length ? current.style.background = '#0ec997' : null
       
       return possibleMoves
+   }
+
+   private king_check_place(currField:HTMLElement):void{
+      const [, clr] = currField.classList
+      const oppClr = oppositeColor[clr as PlayerColor]
+
+      const currFields = this.field.reduce( (p, c) => p.concat(c) ).filter(x => x.classList.contains(clr))
+      const enemyFields = this.field.reduce( (p, c) => p.concat(c) ).filter(x => x.classList.contains(oppClr))
+
+      // CURRENT, GO FOR CHECK
+      for(let x of currFields){
+         const [col, row] = Object.values(x.dataset).map(x => parseInt(x!))
+
+         const f = this.createPath(this.field[col - 1][row - 1], col, row, clr as PlayerColor, true)
+         
+         for(let y of f){
+            if(y.className === `king ${oppClr}`){
+               const c = this.check
+
+               c.player_color = oppClr
+               c.original_color = y.style.background
+               c.danger = true
+               c.king = y
+               c.enemyMoves = f
+               c.enemy = this.field[col - 1][row - 1]
+
+               y.style.background = 'red'
+
+               this.finishCheck(enemyFields, oppClr)
+
+               return
+            }
+         }
+      }
    }
 
    private isEnemy(field:HTMLElement):boolean{
@@ -396,9 +518,154 @@ export class Game {
       return false
    }
 
+   private checkHandle(moves:Array<HTMLElement>, c:any, turn:PlayerColor, f:HTMLElement):void{
+      const arr = [...c.enemyMoves]
+      let canClr = false
+
+      // AFTER CLICK
+      if(f.classList.contains('king')){
+            for(let x of [...moves]){
+               const prevClass = x.className
+               const cKingClass = c.king.className
+
+               x.className = cKingClass
+               c.king.className = ''
+               
+
+               const [e_col, e_row] = Object.values(c.enemy.dataset).map((x:any) => parseInt(x!))
+               const enemyMoves = this.createPath(c.enemy, e_col, e_row, oppositeColor[turn], true)
+
+               for(let y of enemyMoves){
+                  if(y.className === `king ${turn}`){
+                     while(x.children.length){
+                        x.children[0].remove()
+                     }
+                     const ind = moves.indexOf(x)
+                     moves.splice(ind, 1)
+
+                     continue
+                  }
+               }
+
+               x.className = prevClass
+               c.king.className = cKingClass
+
+               continue
+            }
+      }else{
+            for(let x of [...moves]){
+               if(x === c.enemy) continue
+
+               if( !arr.includes(x) ){
+                  for(let i=0; i<=x.children.length; i++){
+                     const ch = x.children
+                     if(ch[i]?.tagName === 'SPAN') ch[i].remove()
+
+                     const ind = moves.indexOf(x)
+                     moves.splice(ind, 1)
+                  }
+                  continue
+               }
+                       
+               x.classList.add(oppositeColor[turn])
+
+               const [e_col, e_row] = Object.values(c.enemy.dataset).map((x:any) => parseInt(x!))
+               const enemyMoves = this.createPath(c.enemy, e_col, e_row, oppositeColor[turn], true)
+
+               x.classList.remove(oppositeColor[turn])
+
+               if(!enemyMoves.includes(c.king)) canClr = true
+
+               if(enemyMoves.includes(c.king)){
+                  const ind = moves.indexOf(x)
+                  moves.splice(ind, 1) 
+
+                  for(let i=0; i<=x.children.length; i++){
+                     const ch = x.children
+                     if(ch[i]?.tagName === 'SPAN') ch[i].remove()
+                  }
+               }      
+            }
+      }
+   }
+
+   private movePreventCheck(moves:Array<HTMLElement>, turn:PlayerColor, cf:HTMLElement):void{
+      const enemies = this.field.reduce((p, c) => p.concat(c)).filter(x => x.classList.contains(oppositeColor[turn]))
+      const set:Set<HTMLElement> = new Set()
+      const prevClass = cf.className
+
+      let len = moves.length
+
+      while(len--){
+         const m = moves[len]
+
+         const pc = m.className
+
+         cf.className = ''
+         m.className = prevClass
+
+         const king = this.field.reduce((p, c) => p.concat(c)).filter(x => x.className === `king ${turn}`)[0]
+
+         for(let x of enemies){
+            const [col, row] = Object.values(x.dataset).map(x => parseInt(x!))
+            const enemyMoves = this.createPath(x, col, row, oppositeColor[turn], true)
+
+            for(let y of enemyMoves){
+               if(y.className === `king ${turn}`){
+                  set.add(moves[len])    
+
+               }else if(y === king){
+                  const ind = moves.indexOf(moves[len])
+
+                  const span = [...moves[len].children].filter(x => x.tagName === 'SPAN')[0]
+                  span.remove()
+                  moves.splice(ind, 1)        
+               }     
+            }
+         }
+
+         m.className = pc
+         cf.className = prevClass
+      }
+
+      for(let x of set){
+         const ind = moves.indexOf(x as HTMLElement)
+
+         if(moves[ind]?.children){
+            const span = [...moves[ind].children].filter(x => x.tagName === 'SPAN')
+            span.length ? span[0].remove() : null
+         }
+         
+         moves.splice(ind, 1)
+      }
+   }
+
+   public finishCheck(checked_king_pieces:Array<HTMLElement>, checked_king_clr:PlayerColor){
+      let availableMoves = []
+
+      for(let x of checked_king_pieces){
+         const [col, row] = Object.values(x.dataset).map(x => parseInt(x!))
+         
+         const x1 = this.createPath(x, col, row, checked_king_clr, true)
+         this.checkHandle(x1, this.check, checked_king_clr, x)
+         this.movePreventCheck(x1, checked_king_clr, x)
+
+         if(x1.length){
+            availableMoves.push(x1)
+            break
+         }
+      }
+
+      availableMoves.length ? null : this.end = true
+   }
+
+
+
    //--- PUBLIC METHODS ---//
 
-   public constructor(white_and_black_array:Array<{ name: string, white: string, black: string }>) {
+
+
+   public constructor(white_and_black_array:Array<{ name: string, white: string, black: string }>, field:HTMLElement) {
       for(let x of white_and_black_array){    
          switch(x.name){
             case "pawn": this.pawn = { white: x.white, black: x.black }   
@@ -426,17 +693,37 @@ export class Game {
       if(!this.pawn || !this.rook || !this.knight || !this.bishop || !this.queen || !this.king){
          throw new Error('Not all fields are initialized, check if "name" starts with non capital letter')
       }
+
+      this.board = field
+      this.restartCb = () => {}
+      this.field = [
+         [], [], [], [], [], [], [], []
+      ]
+      this.castle = {
+         white:{
+            canDo: true,
+            kingMoved: false,
+            leftRookMoved: false,
+            rightRookMoved: false
+         },
+         black: {
+            canDo: true, 
+            kingMoved: false,
+            leftRookMoved: false,
+            rightRookMoved:false
+         }
+      }
    }
 
    public *swapTurn():Generator<string> {
       let turn:string = 'black'
       while(true){
-         turn = turn === 'black' ? 'white' : 'black'
+         turn = oppositeColor[turn as PlayerColor]
          yield turn
       }
    }
 
-   public draw_start(container:HTMLElement):Array<HTMLElement> {
+   public draw_start():Array<HTMLElement> {
       let actual = 0
 
       for(let i = 1; i <= 8; i++){
@@ -467,26 +754,28 @@ export class Game {
 
             this.field[i-1].push(div)
 
-            container.appendChild(div)
+            this.board.appendChild(div)
          }
       }
       
       return this.field.reduce( (p, c) => p.concat(c) )
    }
 
-   public addClick(arrayElements:Array<HTMLElement>, callback:(dataset:col_row_int) => void) {   
+   public addClick(arrayElements:Array<HTMLElement>, callback:Function) {  
       for(let x of arrayElements){
          x.addEventListener('click', (e:Event) => {      
             const t = e.target as HTMLElement
-            
+
             callback( this.dataset_to_int({ ...t.dataset }) )
          })
       }
+
+      this.restartCb = callback
    }
 
-   public clickPath(col:number, row:number, turn:string):Array<any> {
+   public clickPath(col:number, row:number, turn:PlayerColor):Array<any> {
       const f = this.field[col - 1][row - 1]
-      
+
       if(f.classList.contains(turn)){
          this.currentField = {
             element: f,
@@ -495,44 +784,98 @@ export class Game {
          
          const moves = this.createPath(f, col, row, turn)
 
+         const c = this.check
+         if(c.danger){
+            this.checkHandle(moves, c, turn, f)
+         }
+ 
+         this.movePreventCheck(moves, turn, f)
+
+         moves.length ? f.style.background = '#0ec997' : null
+
          return [moves, this.currentField]
       }
 
       return []
    }
 
-   public movePiece(moveTo:HTMLElement, current:HTMLElement){
+   public movePiece(moveTo:HTMLElement, current:HTMLElement):void{
       if(this.isEnemy(moveTo)){
          while(moveTo.children.length){
             moveTo.children[0].remove()
          }
       }
 
+      if(this.check.danger){
+         const c = this.check
+
+         c.king.style.background = c.original_color
+
+         c.player_color = null
+         c.original_color = null
+         c.danger = null
+         c.king = null
+         c.enemyMoves = null
+         c.enemy = null
+      }
+
+      /*------------------------------- CASTLING -------------------------------*/
+
+      const classlist = [...current.classList]
+      const pieceType = classlist.filter(x => x !== 'white' && x !== 'black').toString()
+      const pieceColor:PlayerColor = classlist.filter(x => x === 'white' || x === 'black').toString() as PlayerColor
+      const rookSide = parseInt(current.dataset.row!) > 4 ? 'right' : 'left'
+
+      // @ts-ignore
+      if(pieceType === 'rook' && !this.castle[pieceColor][`${rookSide}RookMoved`]){
+         // @ts-ignore
+         this.castle[pieceColor][`${rookSide}RookMoved`] = true
+
+         if(this.castle[pieceColor].leftRookMoved && this.castle[pieceColor].rightRookMoved){
+            this.castle[pieceColor].canDo = false
+         }
+      }
+
+      if(pieceType === 'king' && !this.castle[pieceColor].kingMoved){
+         const nextRow = parseInt(moveTo.dataset.row!)
+
+         if(this.castle[pieceColor].canDo && (nextRow === 7 || nextRow === 3 ) ){
+            const currCol = parseInt(current.dataset.col!)
+            const currRow = parseInt(current.dataset.row!)
+
+            const rook = nextRow === 3 ? this.field[currCol - 1][0] : this.field[currCol - 1][7]
+            const rookFieldTo = nextRow === 3 ? this.field[currCol - 1][currRow - 2] : this.field[currCol - 1][currRow]
+
+            this.movePiece(rookFieldTo, rook)
+         }
+
+         this.castle[pieceColor].kingMoved = true
+         this.castle[pieceColor].canDo = false
+      }
+
+      /*------------------------------- ^^^ CASTLING ^^^ -------------------------------*/
+
       const [c_type, c_clr] = current.classList
 
-      moveTo.className = `${c_type} ${c_clr}`
       const img = document.createElement('img')
       // @ts-ignore 
       img.src = this[c_type][c_clr]    
       moveTo.appendChild(img)
+      moveTo.className = `${c_type} ${c_clr}`
 
       while(current.children.length){
          current.children[0].remove()
       }
       current.className = ''
+
+      this.king_check_place(moveTo)
    }
 
-   public isKingDead(turn:string):boolean{
-      const reducedField = this.field.reduce( (p, c) => p.concat(c) ).map(x => x.classList.value)
-
-      for(let x of reducedField){
-         if(x === `king ${turn}`) return false
-      }
-
-      return true
+   public isKingDead():boolean{
+      return this.end
    }
 
-   public finishText(turn:string, styleClass?:string){
+   public finishPopUpText(turn:PlayerColor, element:HTMLElement, styleClass?:string):void{
       const h2 = document.createElement('h2')
       const img = document.createElement('img')
 
@@ -540,14 +883,62 @@ export class Game {
          h2.classList.add(styleClass)
       }
 
-      // @ts-ignore
       img.src = this.king![turn]
 
       h2.appendChild(img)
       h2.appendChild(document.createTextNode('WIN'))
       h2.classList.add(turn)
 
-      document.body.appendChild(h2)
+      element.appendChild(h2)
+   }
+
+   public restartGame():void{
+      while(this.board.children.length){
+         this.board.children[0].remove()
+      }
+
+      this.field = [
+         [], [], [], [], [], [], [], []
+      ]
+
+      const arr = this.draw_start()
+      this.addClick(arr, this.restartCb)
+
+      this.end = false
+
+      this.check = {
+         player_color: '',
+         original_color: '',
+         danger: false,
+         king: null,
+         enemyMoves: null,
+         enemy: null
+      }
+   }
+
+   public startTimer(minutes:HTMLElement, seconds:HTMLElement):void{
+      let m = 0
+      let s = 0
+      minutes.textContent = '00'
+      seconds.textContent = '00'
+
+      this.timer = setInterval(() => {
+         if(s >= 59){
+            m += 1
+            s = -1
+         }
+
+         s += 1
+         const sec = `0${s.toString()}`.slice(-2)
+         const min = `0${m.toString()}`.slice(-2)
+
+         minutes.textContent = min
+         seconds.textContent = sec
+      }, 1000)
+   }
+
+   public stopTimer():void{
+      clearInterval(this.timer)
    }
 
 }

@@ -1,10 +1,5 @@
 # Typescript and HTML chess game
-Available modes: player vs player
-
-# Not implemented yet:
--castling <br>
--responsive <br>
--check <br>
--restart
+# V.1.0
+Available modes: player vs player 
 
 # ICONS AUTHOR IN icons_author.json
